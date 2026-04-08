@@ -5,6 +5,7 @@ import helmet    from "helmet";
 import rateLimit from "express-rate-limit";
 import { logger }       from "./middleware/logger.js";
 import { authenticate } from "./middleware/auth.js";
+import { requireRole }  from "./middleware/requireRole.js";
 import { authProxy }    from "./routes/auth.js";
 import { usersProxy }   from "./routes/users.js";
 import { uploadProxy }  from "./routes/upload.js";
@@ -48,10 +49,10 @@ app.get("/health", (_req, res) => {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use("/auth",   authProxy);                       // public
-app.use("/users",  authenticate, usersProxy);        // protected
-app.use("/upload", authenticate, uploadProxy);       // protected
-app.use("/videos", authenticate, videosProxy);       // protected
+app.use("/auth",   authProxy);                                              // public
+app.use("/users",  authenticate, usersProxy);                               // any logged-in user
+app.use("/upload", authenticate, requireRole("admin", "festival", "athlete"), uploadProxy); // approved accounts only
+app.use("/videos", authenticate, videosProxy);                              // any logged-in user
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {

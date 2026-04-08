@@ -9,9 +9,11 @@ export const usersProxy = createProxyMiddleware({
   on: {
     proxyReq: (proxyReq, req) => {
       if (req.user) {
-        proxyReq.setHeader("X-User-Id",    req.user.id);
-        proxyReq.setHeader("X-User-Email", req.user.email);
-        proxyReq.setHeader("X-User-Role",  req.user.role ?? "user");
+        const meta = req.user.user_metadata ?? {};
+        proxyReq.setHeader("X-User-Id",     req.user.id);
+        proxyReq.setHeader("X-User-Email",  req.user.email);
+        proxyReq.setHeader("X-User-Role",   meta.role   ?? "viewer");
+        proxyReq.setHeader("X-User-Status", meta.status ?? "active");
       }
     },
     proxyRes: (proxyRes, req) => {
