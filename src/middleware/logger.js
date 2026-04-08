@@ -1,0 +1,12 @@
+export function logger(req, res, next) {
+  const start = Date.now();
+  const { method, originalUrl } = req;
+
+  res.on("finish", () => {
+    const ms    = Date.now() - start;
+    const level = res.statusCode >= 500 ? "ERROR" : res.statusCode >= 400 ? "WARN" : "INFO";
+    console.log(`[${new Date().toISOString()}] ${level} ${method} ${originalUrl} → ${res.statusCode} (${ms}ms)`);
+  });
+
+  next();
+}
