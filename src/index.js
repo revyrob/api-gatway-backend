@@ -3,6 +3,7 @@ import express   from "express";
 import cors      from "cors";
 import helmet    from "helmet";
 import rateLimit from "express-rate-limit";
+import { Resend } from "resend";
 import { logger }       from "./middleware/logger.js";
 import { authenticate } from "./middleware/auth.js";
 import { requireRole }  from "./middleware/requireRole.js";
@@ -11,15 +12,26 @@ import { usersProxy }   from "./routes/users.js";
 import { uploadProxy }  from "./routes/upload.js";
 import { videosProxy }  from "./routes/videos.js";
 
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 const app  = express();
 const PORT = process.env.PORT || 4000;
 
+const corsOptions = {
+  origin:         process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials:    true,
+  methods:        ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
 // ── Security ──────────────────────────────────────────────────────────────────
-app.use(helmet());
-app.use(cors({
-  origin:      process.env.FRONTEND_URL || "http://localhost:5173",
-  credentials: true,
-}));
+app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(cors(corsOptions));
+
+// Explicitly handle every OPTIONS preflight BEFORE proxy middleware sees it.
+// http-proxy-middleware intercepts OPTIONS and never calls next(), so cors()
+// alone is not enough — we need this dedicated handler first.
+app.options("/{*path}", cors(corsOptions));
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
 const authLimiter = rateLimit({
@@ -49,8 +61,35 @@ app.get("/health", (_req, res) => {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use("/auth",   authProxy);                                              // public
-app.use("/users",  authenticate, usersProxy);                               // any logged-in user
+app.use("/auth",    authProxy);                                              // public
+
+// ── Contact form — handled directly, no proxy ────────────────────────────────
+app.use(express.json());
+app.post("/contact", async (req, res) => {
+  const { name, email, reason, message } = req.body ?? {};
+  if (!name || !email || !reason || !message) {
+    return res.status(400).json({ error: "All fields are required." });
+  }
+  try {
+    await resend.emails.send({
+      from:    process.env.RESEND_FROM    || "onboarding@resend.dev",
+      to:      process.env.ADMIN_EMAIL,
+      replyTo: email,
+      subject: `[${reason}] from ${name}`,
+      html: `<p><strong>Reason:</strong> ${reason}</p>
+             <p><strong>Name:</strong> ${name}</p>
+             <p><strong>Email:</strong> ${email}</p>
+             <hr/>
+             <p style="white-space:pre-wrap">${message}</p>`,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[contact]", err.message);
+    res.status(500).json({ error: "Failed to send message." });
+  }
+});
+
+app.use("/users",   authenticate, usersProxy);                              // any logged-in user
 app.use("/upload", authenticate, requireRole("admin", "festival", "athlete"), uploadProxy); // approved accounts only
 app.use("/videos", authenticate, videosProxy);                              // any logged-in user
 
