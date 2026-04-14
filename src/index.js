@@ -7,10 +7,13 @@ import { Resend } from "resend";
 import { logger }       from "./middleware/logger.js";
 import { authenticate } from "./middleware/auth.js";
 import { requireRole }  from "./middleware/requireRole.js";
-import { authProxy }    from "./routes/auth.js";
-import { usersProxy }   from "./routes/users.js";
-import { uploadProxy }  from "./routes/upload.js";
-import { videosProxy }  from "./routes/videos.js";
+import { authProxy }          from "./routes/auth.js";
+import { usersProxy }         from "./routes/users.js";
+import { uploadProxy }        from "./routes/upload.js";
+import { videosProxy }        from "./routes/videos.js";
+import { athletesProxy }      from "./routes/athletes.js";
+import { festivalsProxy }     from "./routes/festivals.js";
+import { notificationsProxy } from "./routes/notifications.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -89,9 +92,12 @@ app.post("/contact", async (req, res) => {
   }
 });
 
-app.use("/users",   authenticate, usersProxy);                              // any logged-in user
-app.use("/upload", authenticate, requireRole("admin", "festival", "athlete"), uploadProxy); // approved accounts only
-app.use("/videos", authenticate, videosProxy);                              // any logged-in user
+app.use("/users",         authenticate, usersProxy);                              // any logged-in user
+app.use("/upload",        authenticate, requireRole("admin", "festival", "athlete"), uploadProxy);
+app.use("/videos",        authenticate, videosProxy);                             // any logged-in user
+app.use("/athletes",      authenticate, athletesProxy);                           // any logged-in user
+app.use("/festivals",     authenticate, festivalsProxy);                          // any logged-in user
+app.use("/notifications", authenticate, notificationsProxy);                     // any logged-in user
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
